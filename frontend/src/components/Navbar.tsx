@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { ShoppingBag, ShoppingCart, User as UserIcon, Search } from 'lucide-react';
+import { ShoppingBag, ShoppingCart, User as UserIcon, Shield } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useState, useEffect } from 'react';
@@ -24,20 +24,19 @@ export default function Navbar() {
           <span>Shop<span className="text-emerald-600">Sphere</span></span>
         </Link>
 
-        {/* Search */}
-        <div className="hidden md:flex flex-1 max-w-md relative">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            placeholder="Search products, brands and electronics..."
-            className="w-full pl-9 pr-4 py-1.5 text-sm rounded-lg border border-slate-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-600"
-          />
-        </div>
-
         {/* Navigation Actions */}
         <nav className="flex items-center gap-5 text-sm font-medium text-slate-600">
           <Link href="/products" className="hover:text-emerald-600 transition">
             Catalogue
+          </Link>
+
+          {/* Admin Link (Always accessible for easy inspection & admin switching) */}
+          <Link
+            href="/admin"
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-semibold bg-slate-900 text-amber-400 hover:bg-slate-800 transition"
+          >
+            <Shield className="w-3.5 h-3.5 text-amber-400" />
+            <span>Admin Portal</span>
           </Link>
 
           {/* Cart with count badge */}
@@ -59,7 +58,7 @@ export default function Navbar() {
             <div className="flex items-center gap-2 text-slate-900 font-semibold text-xs">
               <span className="px-2.5 py-1 bg-slate-100 rounded-full flex items-center gap-1">
                 <UserIcon className="w-3.5 h-3.5" />
-                {user.firstName} ({user.role})
+                {user.firstName}
               </span>
             </div>
           ) : (
