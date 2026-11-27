@@ -36,6 +36,9 @@ export default function Navbar() {
           <Link href="/products" className="hover:text-emerald-600 transition">
             Catalogue
           </Link>
+          <Link href="/orders" className="hover:text-emerald-600 transition">
+            Orders
+          </Link>
 
           {/* Admin Link (Always accessible for easy inspection & admin switching) */}
           <Link
@@ -63,10 +66,14 @@ export default function Navbar() {
           {/* Auth State */}
           {mounted && user ? (
             <div className="flex items-center gap-2 text-slate-900 font-semibold text-xs">
-              <span className="px-2.5 py-1 bg-slate-100 rounded-full flex items-center gap-1">
+              <Link
+                href="/profile"
+                className="px-2.5 py-1 bg-slate-100 hover:bg-slate-200 rounded-full flex items-center gap-1 transition"
+                title="View Profile & Addresses"
+              >
                 <UserIcon className="w-3.5 h-3.5" />
                 {user.firstName}
-              </span>
+              </Link>
               <button
                 onClick={handleLogout}
                 title="Logout"

@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ShoppingBag, Lock, Mail, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from '@/lib/api';
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -20,19 +21,35 @@ export default function LoginPage() {
     setLoading(true);
 
     try {
-      // In development, handle auth directly or via API
+      try {
+        const res = await apiFetch('/auth/login', {
+          method: 'POST',
+          body: JSON.stringify({ email, password }),
+        });
+        setAuth(res.data.user, res.data.accessToken);
+        router.push(res.data.user.role === 'ADMIN' ? '/admin' : '/products');
+        return;
+      } catch (apiErr: any) {
+        // If backend returned an explicit auth error (e.g. 401), surface it;
+        // otherwise fall back to local demo mode when backend is offline.
+        if (apiErr.message && !apiErr.message.includes('fetch')) {
+          throw apiErr;
+        }
+      }
+
       if (email && password) {
+        const role = email.includes('admin') ? 'ADMIN' : 'CUSTOMER';
         setAuth(
           {
             id: 'u-demo-1',
             email,
             firstName: email.split('@')[0],
             lastName: 'User',
-            role: email.includes('admin') ? 'ADMIN' : 'CUSTOMER',
+            role,
           },
           'mock-jwt-token'
         );
-        router.push('/products');
+        router.push(role === 'ADMIN' ? '/admin' : '/products');
       }
     } catch (err: any) {
       setError(err.message || 'Login failed');

@@ -92,4 +92,91 @@ export class PaymentService {
       return updatedOrder;
     });
   }
+
+  static async handleWebhook(signature: string | undefined, payload: any) {
+    const webhookSecret = process.env.RAZORPAY_WEBHOOK_SECRET || 'webhook_secret_placeholder';
+    const expectedSignature = crypto
+      .createHmac('sha256', webhookSecret)
+      .update(JSON.stringify(payload))
+      .digest('hex');
+
+    const isValid =
+      process.env.NODE_ENV === 'development' ||
+      (signature && expectedSignature === signature);
+
+    if (!isValid) {
+      throw new AppError('Invalid webhook signature', 400);
+    }
+
+    const event = payload?.event as string | undefined;
+    const paymentEntity = payload?.payload?.payment?.entity;
+    const razorpayOrderId = paymentEntity?.order_id as string | undefined;
+    const razorpayPaymentId = paymentEntity?.id as string | undefined;
+
+    if (!razorpayOrderId) {
+      return { handled: false, reason: 'Missing razorpay order_id' };
+    }
+
+    const payment = await prisma.payment.findUnique({
+      where: { razorpayOrderId },
+      include: { order: { include: { items: true } } },
+    });
+
+    if (!payment) {
+      return { handled: false, reason: 'Payment record not found' };
+    }
+
+    // Idempotency guard against duplicate webhook deliveries
+    if (payment.status === PaymentStatus.SUCCESS && event === 'payment.captured') {
+      return { handled: true, duplicate: true, status: 'SUCCESS' };
+    }
+
+    if (event === 'payment.captured') {
+      await prisma.$transaction(async (tx) => {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: {
+            status: PaymentStatus.SUCCESS,
+            razorpayPaymentId: razorpayPaymentId || payment.razorpayPaymentId,
+          },
+        });
+
+        if (payment.order.status === OrderStatus.PENDING_PAYMENT) {
+          await tx.order.update({
+            where: { id: payment.orderId },
+            data: { status: OrderStatus.CONFIRMED },
+          });
+        }
+      });
+      return { handled: true, event, status: 'CONFIRMED' };
+    }
+
+    if (event === 'payment.failed') {
+      await prisma.$transaction(async (tx) => {
+        await tx.payment.update({
+          where: { id: payment.id },
+          data: { status: PaymentStatus.FAILED },
+        });
+
+        if (payment.order.status === OrderStatus.PENDING_PAYMENT) {
+          for (const item of payment.order.items) {
+            await tx.inventory.updateMany({
+              where: { productId: item.productId },
+              data: {
+                reservedQuantity: { decrement: item.quantity },
+              },
+            });
+          }
+
+          await tx.order.update({
+            where: { id: payment.orderId },
+            data: { status: OrderStatus.CANCELLED },
+          });
+        }
+      });
+      return { handled: true, event, status: 'CANCELLED' };
+    }
+
+    return { handled: false, event };
+  }
 }

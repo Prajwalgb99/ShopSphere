@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { Product } from '@/types';
 import { useCartStore } from '@/store/useCartStore';
 import { ShoppingCart, Check } from 'lucide-react';
@@ -31,7 +32,7 @@ export default function ProductCard({ product }: ProductCardProps) {
   return (
     <div className="group rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition flex flex-col">
       {/* Product Image */}
-      <div className="relative aspect-square w-full bg-slate-100 overflow-hidden">
+      <Link href={`/products/${product.id}`} className="relative aspect-square w-full bg-slate-100 overflow-hidden block">
         <img
           src={product.imageUrl}
           alt={product.title}
@@ -47,7 +48,7 @@ export default function ProductCard({ product }: ProductCardProps) {
             Only {product.availableStock} left
           </span>
         ) : null}
-      </div>
+      </Link>
 
       {/* Product Details */}
       <div className="p-4 flex-1 flex flex-col justify-between">
@@ -57,9 +58,11 @@ export default function ProductCard({ product }: ProductCardProps) {
               {product.category.name}
             </span>
           )}
-          <h3 className="font-semibold text-slate-900 text-sm mt-1 line-clamp-2">
-            {product.title}
-          </h3>
+          <Link href={`/products/${product.id}`}>
+            <h3 className="font-semibold text-slate-900 text-sm mt-1 line-clamp-2 hover:text-emerald-600 transition">
+              {product.title}
+            </h3>
+          </Link>
           <p className="text-slate-500 text-xs mt-1 line-clamp-2">
             {product.description}
           </p>

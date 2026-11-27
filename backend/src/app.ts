@@ -12,6 +12,7 @@ import paymentRoutes from './routes/payment.routes.js';
 import adminRoutes from './routes/admin.routes.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { notFoundHandler } from './middleware/notFound.js';
+import { apiRateLimiter, authRateLimiter } from './middleware/rateLimiter.js';
 
 const app = express();
 
@@ -26,9 +27,12 @@ app.use(morgan(config.nodeEnv === 'development' ? 'dev' : 'combined'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Rate Limiting
+app.use('/api/v1', apiRateLimiter);
+
 // Core API Routes
 app.use('/api/v1', healthRoutes);
-app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/auth', authRateLimiter, authRoutes);
 app.use('/api/v1', productRoutes);
 app.use('/api/v1/cart', cartRoutes);
 app.use('/api/v1/orders', orderRoutes);

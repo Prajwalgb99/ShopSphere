@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ShoppingBag, Lock, Mail, User, ArrowRight } from 'lucide-react';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useRouter } from 'next/navigation';
+import { apiFetch } from '@/lib/api';
 
 export default function RegisterPage() {
   const [firstName, setFirstName] = useState('');
@@ -22,6 +23,20 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
+      try {
+        const res = await apiFetch('/auth/register', {
+          method: 'POST',
+          body: JSON.stringify({ firstName, lastName, email, password }),
+        });
+        setAuth(res.data.user, res.data.accessToken);
+        router.push('/products');
+        return;
+      } catch (apiErr: any) {
+        if (apiErr.message && !apiErr.message.includes('fetch')) {
+          throw apiErr;
+        }
+      }
+
       if (firstName && email && password) {
         setAuth(
           {

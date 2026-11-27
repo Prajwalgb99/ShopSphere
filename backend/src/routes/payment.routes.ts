@@ -4,6 +4,9 @@ import { authenticate } from '../middleware/auth.js';
 
 const router = Router();
 
+// Public webhook endpoint (authenticated via HMAC signature)
+router.post('/webhook', PaymentController.webhook);
+
 router.use(authenticate);
 
 router.post('/create-order', PaymentController.createPaymentOrder);

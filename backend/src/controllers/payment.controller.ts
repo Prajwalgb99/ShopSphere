@@ -28,4 +28,17 @@ export class PaymentController {
       next(error);
     }
   }
+
+  static async webhook(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+    try {
+      const signature = req.headers['x-razorpay-signature'] as string | undefined;
+      const result = await PaymentService.handleWebhook(signature, req.body);
+      res.status(200).json({
+        success: true,
+        data: result,
+      });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
