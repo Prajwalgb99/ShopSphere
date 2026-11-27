@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { ShoppingBag, ShoppingCart, User as UserIcon, Shield } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { ShoppingBag, ShoppingCart, User as UserIcon, Shield, LogOut } from 'lucide-react';
 import { useCartStore } from '@/store/useCartStore';
 import { useAuthStore } from '@/store/useAuthStore';
 import { useState, useEffect } from 'react';
@@ -9,11 +10,17 @@ import { useState, useEffect } from 'react';
 export default function Navbar() {
   const [mounted, setMounted] = useState(false);
   const totalItems = useCartStore((state) => state.totalItems());
-  const user = useAuthStore((state) => state.user);
+  const { user, logout } = useAuthStore();
+  const router = useRouter();
 
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  const handleLogout = () => {
+    logout();
+    router.push('/login');
+  };
 
   return (
     <header className="border-b bg-white/95 backdrop-blur sticky top-0 z-50">
@@ -60,6 +67,14 @@ export default function Navbar() {
                 <UserIcon className="w-3.5 h-3.5" />
                 {user.firstName}
               </span>
+              <button
+                onClick={handleLogout}
+                title="Logout"
+                className="flex items-center gap-1 px-2.5 py-1 rounded-lg border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 transition"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Logout</span>
+              </button>
             </div>
           ) : (
             <Link

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ShoppingBag,
   LayoutDashboard,
@@ -18,9 +19,11 @@ import {
   Edit2,
   Trash2,
   Filter,
+  LogOut,
 } from 'lucide-react';
 import { MOCK_PRODUCTS } from '@/data/mockProducts';
 import { Product } from '@/types';
+import { useAuthStore } from '@/store/useAuthStore';
 
 interface AdminOrder {
   id: string;
@@ -89,6 +92,30 @@ export default function AdminDashboardPage() {
   const [restockProduct, setRestockProduct] = useState<Product | null>(null);
   const [newStockValue, setNewStockValue] = useState<number>(0);
   const [isAddProductOpen, setIsAddProductOpen] = useState(false);
+
+  // Edit Product & Confirmation Modal States
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editProductForm, setEditProductForm] = useState({
+    title: '',
+    category: 'electronics',
+    price: '',
+    stock: '',
+    imageUrl: '',
+    description: '',
+  });
+  const [confirmAction, setConfirmAction] = useState<{
+    type: 'delete' | 'edit';
+    product: Product;
+    updatedProduct?: Product;
+  } | null>(null);
+
+  const router = useRouter();
+  const { user, logout } = useAuthStore();
+
+  const handleLogout = () => {
+    logout();
+    router.push('/login');
+  };
 
   // Add Product Form State
   const [newProductForm, setNewProductForm] = useState({
@@ -172,6 +199,71 @@ export default function AdminDashboardPage() {
     );
   };
 
+  // Open Edit Modal
+  const openEditModal = (product: Product) => {
+    setEditingProduct(product);
+    setEditProductForm({
+      title: product.title,
+      category: product.category?.slug || 'electronics',
+      price: String(product.price),
+      stock: String(product.availableStock),
+      imageUrl: product.imageUrl,
+      description: product.description,
+    });
+  };
+
+  // Request Permission before saving Edit
+  const handleEditSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingProduct) return;
+
+    const categoryNames: Record<string, string> = {
+      electronics: 'Electronics',
+      fashion: 'Fashion',
+      'home-living': 'Home & Living',
+      fitness: 'Fitness & Sports',
+    };
+
+    const updatedProduct: Product = {
+      ...editingProduct,
+      title: editProductForm.title,
+      slug: editProductForm.title.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+      description: editProductForm.description,
+      price: Number(editProductForm.price),
+      imageUrl: editProductForm.imageUrl || editingProduct.imageUrl,
+      categoryId: `cat-${editProductForm.category}`,
+      category: {
+        id: `cat-${editProductForm.category}`,
+        name: categoryNames[editProductForm.category] || editProductForm.category,
+        slug: editProductForm.category,
+      },
+      availableStock: Number(editProductForm.stock) || 0,
+    };
+
+    setConfirmAction({
+      type: 'edit',
+      product: editingProduct,
+      updatedProduct,
+    });
+  };
+
+  // Execute Confirmed Action (Yes)
+  const handleConfirmYes = () => {
+    if (!confirmAction) return;
+
+    if (confirmAction.type === 'delete') {
+      setProducts((prev) => prev.filter((item) => item.id !== confirmAction.product.id));
+    } else if (confirmAction.type === 'edit' && confirmAction.updatedProduct) {
+      setProducts((prev) =>
+        prev.map((item) =>
+          item.id === confirmAction.product.id ? confirmAction.updatedProduct! : item
+        )
+      );
+      setEditingProduct(null);
+    }
+    setConfirmAction(null);
+  };
+
   return (
     <div className="min-h-screen bg-slate-100 flex flex-col">
       {/* Top Admin Header */}
@@ -195,7 +287,16 @@ export default function AdminDashboardPage() {
               ← Back to Storefront
             </Link>
             <div className="h-4 w-px bg-slate-700" />
-            <span className="font-semibold text-slate-300">admin@shopsphere.com</span>
+            <span className="font-semibold text-slate-300">
+              {user?.email || 'admin@shopsphere.com'}
+            </span>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-600/20 text-rose-400 border border-rose-500/30 hover:bg-rose-600 hover:text-white transition font-semibold"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              Logout
+            </button>
           </div>
         </div>
       </header>
@@ -440,15 +541,23 @@ export default function AdminDashboardPage() {
                           ₹{Number(p.price).toLocaleString('en-IN')}
                         </td>
                         <td className="py-3 px-4 text-right">
-                          <button
-                            onClick={() => {
-                              setRestockProduct(p);
-                              setNewStockValue(p.availableStock);
-                            }}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-white font-medium text-[11px] transition shadow-sm"
-                          >
-                            <RefreshCw className="w-3 h-3" /> Restock
-                          </button>
+                          <div className="inline-flex items-center gap-2">
+                            <button
+                              onClick={() => openEditModal(p)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 font-medium text-[11px] transition shadow-sm"
+                            >
+                              <Edit2 className="w-3 h-3" /> Edit
+                            </button>
+                            <button
+                              onClick={() => {
+                                setRestockProduct(p);
+                                setNewStockValue(p.availableStock);
+                              }}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-slate-900 hover:bg-slate-800 text-white font-medium text-[11px] transition shadow-sm"
+                            >
+                              <RefreshCw className="w-3 h-3" /> Restock
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );
@@ -491,14 +600,20 @@ export default function AdminDashboardPage() {
                     <p className="font-bold text-slate-900 text-sm mt-1">₹{Number(p.price).toLocaleString('en-IN')}</p>
                     <div className="flex items-center justify-between mt-2 pt-2 border-t text-[11px]">
                       <span className="text-slate-500">Stock: <strong className="text-slate-800">{p.availableStock}</strong></span>
-                      <button
-                        onClick={() => {
-                          setProducts(products.filter((item) => item.id !== p.id));
-                        }}
-                        className="text-rose-500 hover:text-rose-700 flex items-center gap-0.5"
-                      >
-                        <Trash2 className="w-3 h-3" /> Remove
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => openEditModal(p)}
+                          className="text-slate-700 hover:text-emerald-600 flex items-center gap-1 font-medium"
+                        >
+                          <Edit2 className="w-3 h-3" /> Edit
+                        </button>
+                        <button
+                          onClick={() => setConfirmAction({ type: 'delete', product: p })}
+                          className="text-rose-500 hover:text-rose-700 flex items-center gap-0.5 font-medium"
+                        >
+                          <Trash2 className="w-3 h-3" /> Remove
+                        </button>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -728,6 +843,166 @@ export default function AdminDashboardPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* EDIT PRODUCT MODAL */}
+      {editingProduct && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-xl max-w-md w-full p-6 shadow-xl relative animate-in fade-in zoom-in-95">
+            <button
+              onClick={() => setEditingProduct(null)}
+              className="absolute right-4 top-4 text-slate-400 hover:text-slate-600"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <h3 className="font-bold text-base text-slate-900">Edit Product</h3>
+            <p className="text-xs text-slate-500 mt-1 line-clamp-1">
+              Modifying: {editingProduct.title}
+            </p>
+
+            <form onSubmit={handleEditSubmit} className="mt-4 space-y-3">
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Product Title</label>
+                <input
+                  type="text"
+                  required
+                  value={editProductForm.title}
+                  onChange={(e) => setEditProductForm({ ...editProductForm, title: e.target.value })}
+                  className="mt-1 w-full px-3 py-1.5 border rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700">Category</label>
+                  <select
+                    value={editProductForm.category}
+                    onChange={(e) => setEditProductForm({ ...editProductForm, category: e.target.value })}
+                    className="mt-1 w-full px-3 py-1.5 border rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none bg-white"
+                  >
+                    <option value="electronics">Electronics</option>
+                    <option value="fashion">Fashion</option>
+                    <option value="home-living">Home & Living</option>
+                    <option value="fitness">Fitness & Sports</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700">Price (₹)</label>
+                  <input
+                    type="number"
+                    min="1"
+                    required
+                    value={editProductForm.price}
+                    onChange={(e) => setEditProductForm({ ...editProductForm, price: e.target.value })}
+                    className="mt-1 w-full px-3 py-1.5 border rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-slate-700">Stock Quantity</label>
+                  <input
+                    type="number"
+                    min="0"
+                    required
+                    value={editProductForm.stock}
+                    onChange={(e) => setEditProductForm({ ...editProductForm, stock: e.target.value })}
+                    className="mt-1 w-full px-3 py-1.5 border rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-slate-700">Image URL</label>
+                  <input
+                    type="url"
+                    value={editProductForm.imageUrl}
+                    onChange={(e) => setEditProductForm({ ...editProductForm, imageUrl: e.target.value })}
+                    className="mt-1 w-full px-3 py-1.5 border rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-slate-700">Description</label>
+                <textarea
+                  rows={2}
+                  required
+                  value={editProductForm.description}
+                  onChange={(e) => setEditProductForm({ ...editProductForm, description: e.target.value })}
+                  className="mt-1 w-full px-3 py-1.5 border rounded-lg text-xs focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingProduct(null)}
+                  className="px-4 py-2 rounded-lg border text-xs font-medium text-slate-600 hover:bg-slate-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-sm"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* YES / NO PERMISSION CONFIRMATION MODAL */}
+      {confirmAction && (
+        <div className="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-xl max-w-sm w-full p-6 shadow-2xl relative animate-in fade-in zoom-in-95 border border-slate-200">
+            <div className="flex items-start gap-3">
+              <div
+                className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                  confirmAction.type === 'delete'
+                    ? 'bg-rose-100 text-rose-600'
+                    : 'bg-amber-100 text-amber-600'
+                }`}
+              >
+                <AlertTriangle className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="font-bold text-base text-slate-900">
+                  {confirmAction.type === 'delete'
+                    ? 'Confirm Delete Permission'
+                    : 'Confirm Edit Permission'}
+                </h3>
+                <p className="text-xs text-slate-600 mt-1.5 leading-relaxed">
+                  {confirmAction.type === 'delete'
+                    ? `Are you sure you want to delete "${confirmAction.product.title}"? This action cannot be undone.`
+                    : `Are you sure you want to save the edited changes for "${confirmAction.product.title}"?`}
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 justify-end mt-6">
+              <button
+                type="button"
+                onClick={() => setConfirmAction(null)}
+                className="px-5 py-2 rounded-lg border border-slate-300 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition"
+              >
+                No
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmYes}
+                className={`px-5 py-2 rounded-lg text-white text-xs font-semibold shadow-sm transition ${
+                  confirmAction.type === 'delete'
+                    ? 'bg-rose-600 hover:bg-rose-700'
+                    : 'bg-emerald-600 hover:bg-emerald-700'
+                }`}
+              >
+                Yes
+              </button>
+            </div>
           </div>
         </div>
       )}
